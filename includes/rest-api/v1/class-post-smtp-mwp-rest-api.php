@@ -31,6 +31,13 @@ if ( ! class_exists( 'Post_SMTP_MWP_Rest_API' ) ) :
 		private $site = false;
 
 		/**
+		 * Email log IDs created for the current request (primary + fallback attempts).
+		 *
+		 * @var array
+		 */
+		private $current_log_ids = array();
+
+		/**
 		 * Post_SMTP_MWP_Rest_API constructor.
 		 *
 		 * @since   1.0.0
@@ -129,10 +136,11 @@ if ( ! class_exists( 'Post_SMTP_MWP_Rest_API' ) ) :
 		 */
 		public function send_email( WP_REST_Request $request ) {
 
-			$result  = false;
-			$headers = $request->get_headers();
-			$api_key = empty( $request->get_header( 'api_key' ) ) ? '' : sanitize_text_field( $request->get_header( 'api_key' ) );
-			$site_id = empty( $request->get_header( 'site_id' ) ) ? '' : sanitize_text_field( $request->get_header( 'site_id' ) );
+			$result           = false;
+			$headers          = $request->get_headers();
+			$api_key          = empty( $request->get_header( 'api_key' ) ) ? '' : sanitize_text_field( $request->get_header( 'api_key' ) );
+			$site_id          = empty( $request->get_header( 'site_id' ) ) ? '' : sanitize_text_field( $request->get_header( 'site_id' ) );
+			$this->current_log_ids = array();
 
 			if ( isset( $_GET['actionnonce'] ) // phpcs:disable WordPress.Security.NonceVerification
 				&& isset( $_GET['pingnonce'] ) // phpcs:disable WordPress.Security.NonceVerification
@@ -148,68 +156,133 @@ if ( ! class_exists( 'Post_SMTP_MWP_Rest_API' ) ) :
 					$child_key     = $child_enabled['key'];
 					$result        = apply_filters( 'mainwp_fetchurlverifyaction', __FILE__, $child_key, $this->site_id, $params );
 
-					// All set, let's send email xD.
-					if ( is_array( $result ) && ! empty( $result['success'] ) ) {
+					if ( ! is_array( $result ) || empty( $result['success'] ) ) {
 
-						// Override settings if checked in MainWP -> Extensions -> Post SMTP -> Enable Individual Settings.
-						$this->override_settings();
+						wp_send_json_error(
+							array(
+								'message' => __( 'MainWP verification failed, email not sent.', 'post-smtp' ),
+							),
+							403
+						);
+					}
 
-						$params      = $request->get_params();
-						$to          = isset( $params['to'] ) ? $params['to'] : '';
-						$subject     = isset( $params['subject'] ) ? $params['subject'] : '';
-						$message     = isset( $params['message'] ) ? $params['message'] : '';
-						$headers     = isset( $params['headers'] ) ? $params['headers'] : '';
-						$attachments = isset( $params['attachments'] ) ? $params['attachments'] : array();
+					// All set, let's send email.
+					// Override settings if checked in MainWP -> Extensions -> Post SMTP -> Enable Individual Settings.
+					$this->override_settings();
 
-						// Lets upload files on server.
-						if ( ! empty( $attachments ) ) {
+					$params      = $request->get_params();
+					$to          = isset( $params['to'] ) ? $params['to'] : '';
+					$subject     = isset( $params['subject'] ) ? $params['subject'] : '';
+					$message     = isset( $params['message'] ) ? $params['message'] : '';
+					$headers     = isset( $params['headers'] ) ? $params['headers'] : '';
+					$attachments = isset( $params['attachments'] ) ? $params['attachments'] : array();
 
-							$_attachments = $attachments;
-							$attachments  = array();
-							foreach ( $_attachments as $key => $attachment ) {
+					// Lets upload files on server.
+					if ( ! empty( $attachments ) ) {
 
-								// Get the contents of the file.
-								$file_info     = pathinfo( $key );
-								$absolute_path = strstr( $file_info['dirname'], 'uploads/' );
-								$absolute_path = str_replace( 'uploads', '', $absolute_path );
-								$absolute_path = '/';
+						$_attachments = $attachments;
+						$attachments  = array();
+						foreach ( $_attachments as $key => $attachment ) {
 
-								// Define the filename and destination directory.
-								$filename   = $file_info['basename'];
-								$upload_dir = wp_upload_dir();
+							// Get the contents of the file.
+							$file_info     = pathinfo( $key );
+							$absolute_path = strstr( $file_info['dirname'], 'uploads/' );
+							$absolute_path = str_replace( 'uploads', '', $absolute_path );
+							$absolute_path = '/';
 
-								// Create the file in the upload directory.
-								$file_path   = $upload_dir['path'] . $absolute_path . $filename;
-								$file_url    = $upload_dir['url'] . $absolute_path . $filename;
-								$wp_filetype = wp_check_filetype( $filename, null );
-								$file_data   = wp_upload_bits( $filename, null, $attachment );
+							// Define the filename and destination directory.
+							$filename   = $file_info['basename'];
+							$upload_dir = wp_upload_dir();
 
-								// Check if the file was successfully uploaded.
-								if ( ! $file_data['error'] ) {
-									// The file was uploaded successfully.
-									// Insert the file into the media library.
-									$attachment = array(
-										'post_mime_type' => $wp_filetype['type'],
-										'post_title'     => sanitize_file_name( $filename ),
-										'post_content'   => '',
-										'post_status'    => 'inherit',
-									);
+							// Create the file in the upload directory.
+							$file_path   = $upload_dir['path'] . $absolute_path . $filename;
+							$file_url    = $upload_dir['url'] . $absolute_path . $filename;
+							$wp_filetype = wp_check_filetype( $filename, null );
+							$file_data   = wp_upload_bits( $filename, null, $attachment );
 
-									$attachment_id = wp_insert_attachment( $attachment, $file_data['file'] );
+							// Check if the file was successfully uploaded.
+							if ( ! $file_data['error'] ) {
+								// The file was uploaded successfully.
+								// Insert the file into the media library.
+								$attachment = array(
+									'post_mime_type' => $wp_filetype['type'],
+									'post_title'     => sanitize_file_name( $filename ),
+									'post_content'   => '',
+									'post_status'    => 'inherit',
+								);
 
-									$attachments[] = $file_path;
+								$attachment_id = wp_insert_attachment( $attachment, $file_data['file'] );
 
+								$attachments[] = $file_path;
+
+							}
+						}
+					}
+
+					$mail_result = wp_mail( $to, $subject, $message, $headers, $attachments );
+
+					$logs_data = array();
+					$last_log  = null;
+
+					if ( ! empty( $this->current_log_ids ) ) {
+						// Load log details for this send (primary + fallback attempts) so we can return them to the child site.
+						if ( ! class_exists( 'PostmanEmailQueryLog' ) && defined( 'POST_SMTP_PATH' ) ) {
+							require_once POST_SMTP_PATH . '/Postman/Postman-Email-Log/PostmanEmailQueryLog.php';
+						}
+
+						if ( class_exists( 'PostmanEmailQueryLog' ) ) {
+							$email_query_log = new PostmanEmailQueryLog();
+
+							foreach ( $this->current_log_ids as $log_id ) {
+								$log_row = $email_query_log->get_log( $log_id );
+
+								if ( is_array( $log_row ) ) {
+									$logs_data[] = $log_row;
+									$last_log    = $log_row;
 								}
 							}
 						}
+					}
 
-						$result = wp_mail( $to, $subject, $message, $headers, $attachments );
+					$last_log_id = ! empty( $this->current_log_ids ) ? end( $this->current_log_ids ) : 0;
 
+					if ( $mail_result ) {
+						wp_send_json_success(
+							array(
+								'message'  => __( 'Email sent successfully from MainWP dashboard site.', 'post-smtp' ),
+								// Backwards-compatible single-log fields.
+								'log_id'   => $last_log_id,
+								'log'      => $last_log,
+								// New: full set of logs for this send (primary + fallback attempts).
+								'log_ids'  => $this->current_log_ids,
+								'logs'     => $logs_data,
+							),
+							200
+						);
+					} else {
+						wp_send_json_error(
+							array(
+								'message'  => __( 'Email sending failed on MainWP dashboard site.', 'post-smtp' ),
+								// Backwards-compatible single-log fields.
+								'log_id'   => $last_log_id,
+								'log'      => $last_log,
+								// New: full set of logs for this send (primary + fallback attempts).
+								'log_ids'  => $this->current_log_ids,
+								'logs'     => $logs_data,
+							),
+							500
+						);
 					}
 				}
 			}
 
-			return $result;
+			// If we reached here, something in the initial validation failed.
+			wp_send_json_error(
+				array(
+					'message' => __( 'Invalid request, email not sent.', 'post-smtp' ),
+				),
+				400
+			);
 		}
 
 
@@ -223,6 +296,8 @@ if ( ! class_exists( 'Post_SMTP_MWP_Rest_API' ) ) :
 		public function update_log_meta( $log_id ) {
 
 			// Store Site ID, if log has been created :).
+			$this->current_log_ids[] = (int) $log_id;
+
 			if ( $this->site_id ) {
 
 				postman_add_log_meta( $log_id, 'mainwp_child_site_id', $this->site_id );

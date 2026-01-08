@@ -3,7 +3,7 @@ Contributors: wpexpertsio
 Tags: mainwp, smtp, wp mail, mainwp child, main wp, manage multiple sites, wordpress smtp, gmail smtp, sendgrid smtp, mail, phpmailer, email
 Requires at least: 4.7
 Tested up to: 6.4.2
-Stable tag: 1.0.3
+Stable tag: 1.1.0
 Requires PHP: 7.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
