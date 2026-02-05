@@ -36,6 +36,7 @@ if ( ! class_exists( 'Post_SMTP_MWP_Page' ) ) :
 
 			add_action( 'admin_post_post_smtp_mwp_save_sites', array( $this, 'save_sites' ) );
 			add_action( 'wp_ajax_post-smtp-request-mwp-child', array( $this, 'request_child' ) );
+			add_action( 'post_smtp_wizard_configuration_saved', array( $this, 'broadcast_configuration_to_children' ) );
 		}
 
 
@@ -300,6 +301,7 @@ if ( ! class_exists( 'Post_SMTP_MWP_Page' ) ) :
 							),
 							'body'    => array(
 								'action' => $what,
+								'parent_configured' => $this->is_post_smtp_configured()
 							),
 						)
 					);
@@ -355,6 +357,75 @@ if ( ! class_exists( 'Post_SMTP_MWP_Page' ) ) :
 
 				}
 			}
+		}
+
+		/**
+		 * Broadcast configuration to children
+		 * 
+		 * @since 1.0.0
+		 * @version 1.0.0
+		 */
+		public function broadcast_configuration_to_children() {
+
+			$sites = get_option( 'post_smtp_mainwp_sites' );
+
+			if ( empty( $sites ) ) {
+				return;
+			}
+
+			$child_enabled = apply_filters( 'mainwp_extension_enabled_check', __FILE__ );
+			$child_key     = $child_enabled['key'];
+			$option        = array( 'pubkey' => true );
+
+			foreach ( $sites as $site_id => $site_data ) {
+
+				if ( isset( $site_data['enable_on_child_site'] ) && $site_data['enable_on_child_site'] ) {
+					
+					$website = apply_filters( 'mainwp_getdbsites', __FILE__, $child_key, array( $site_id ), array(), $option );
+					
+					if( empty( $website ) || ! isset( $website[ $site_id ] ) ) {
+						continue;
+					}
+
+					$website  = $website[ $site_id ];
+					$api_key  = md5( $website->pubkey );
+					$site_url = $website->url;
+
+					wp_remote_post(
+						"{$site_url}index.php/wp-json/psmwp/v1/activate-from-mainwp",
+						array(
+							'headers' => array(
+								'API-Key' => $api_key,
+							),
+							'body'    => array(
+								'action' => 'enable_post_smtp',
+								'parent_configured' => $this->is_post_smtp_configured()
+							),
+							'blocking' => false
+						)
+					);
+
+				}
+			}
+
+		}
+
+		/**
+		 * Is Post SMTP Configured
+		 * 
+		 * @return bool
+		 * @since 1.0.0
+		 * @version 1.0.0
+		 */
+		private function is_post_smtp_configured() {
+			
+			$options = get_option( PostmanOptions::POSTMAN_OPTIONS );
+			$transport_type = isset( $options[ PostmanOptions::TRANSPORT_TYPE ] ) ? $options[ PostmanOptions::TRANSPORT_TYPE ] : '';
+			if ( $transport_type !== 'default' ) {
+				return true;
+			}
+			return false;
+			
 		}
 	}
 
