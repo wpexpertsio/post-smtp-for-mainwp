@@ -421,7 +421,7 @@ if ( ! class_exists( 'Post_SMTP_MWP_Page' ) ) :
 			
 			$options = get_option( PostmanOptions::POSTMAN_OPTIONS );
 			$transport_type = isset( $options[ PostmanOptions::TRANSPORT_TYPE ] ) ? $options[ PostmanOptions::TRANSPORT_TYPE ] : '';
-			if ( $transport_type !== 'default' ) {
+			if ( $transport_type !== 'default'  && $transport_type !== '') {
 				return true;
 			}
 			return false;
