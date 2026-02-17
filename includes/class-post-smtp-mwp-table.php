@@ -167,12 +167,11 @@ if ( ! class_exists( 'Post_SMTP_MWP_Table' ) ) :
 		 */
 		public function logs_args( $args ) {
 
-			if ( 'site_id' === $args['order_by'] ) {
-
+			if ( isset( $args['order_by'] ) && 'site_id' === $args['order_by'] ) {
+		
 				$args['order_by'] = 'lm.meta_value';
-
 			}
-
+		
 			return $args;
 		}
 
