@@ -120,9 +120,7 @@ Our SMTP Configuration Support is your one-stop solution for all your WordPress 
 
 = 1.0.4 Feb 19, 2026 =
 * Fix — Resolved an issue with email log synchronization from child sites to the parent site.
-
 * Improvement — Added compatibility for all Pro and Free alerts across all child sites.
-
 * Improvement—Sync button in the header to synchronize all settings from the parent to child sites directly from the MainWP dashboard.
 
 = 1.0.3 Feb 14, 2024 =
