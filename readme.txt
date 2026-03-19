@@ -2,8 +2,8 @@
 Contributors: wpexpertsio
 Tags: mainwp, smtp, wp mail, mainwp child, main wp, manage multiple sites, wordpress smtp, gmail smtp, sendgrid smtp, mail, phpmailer, email
 Requires at least: 4.7
-Tested up to: 6.4.2
-Stable tag: 1.0.4
+Tested up to: 6.9
+Stable tag: 1.0.6
 Requires PHP: 7.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -118,23 +118,27 @@ Our SMTP Configuration Support is your one-stop solution for all your WordPress 
 
 == Changelog ==
 
-= 1.0.4 Feb 19, 2026 =
-* TWEAK - Sync button in the header to synchronize all settings from the parent to child sites directly from the MainWP dashboard.
-* TWEAK - Added compatibility for email failure alerts.
-* FIX - Resolved an issue with email log synchronization from child sites to the parent site.
+= 1.0.6 - Mar 18, 2026 =
+* TWEAK – Sync button in the header to synchronize all settings from the parent to child sites directly from the MainWP dashboard.
+* TWEAK – Added compatibility for email failure alerts.
+* FIX – Resolved an issue with email log synchronization from child sites to the parent site.
+
+= 1.0.5 - Feb 19, 2026 =
+* Reverted the last update.
+
+= 1.0.4 - Feb 19, 2026 =
+* TWEAK – Sync button in the header to synchronize all settings from the parent to child sites directly from the MainWP dashboard.
+* TWEAK – Added compatibility for email failure alerts.
+* FIX – Resolved an issue with email log synchronization from child sites to the parent site.
 
 = 1.0.3 Feb 14, 2024 =
-
 * FIX - Pro conflict with free Add-ons.
 
 = 1.0.2 Feb 07, 2024 =
-
 * Added support for Pro Add-ons.
 
 = 1.0.1 Jan 01, 2024 =
-
 * FIX - Sites' logs switching drop down was not rendering properly.
 
 = 1.0.0 December 18, 2023 =
-
 * Initial Release
